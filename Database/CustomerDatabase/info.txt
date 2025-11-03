@@ -1,0 +1,12 @@
+Download database or use your own database here.
+
+all files should be named as below:
+
+Your_own_database
+|- class_1
+|  |- figure.png
+|  |- figure_mask.png
+|- class_2
+|- ...
+
+which means all figure.png should paired with figure_mask.png
