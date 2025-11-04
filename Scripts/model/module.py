@@ -13,11 +13,11 @@ class CBR(nn.Module):
                  out_channels: int,
                  kernel_size: _size_2_t = 3,
                  stride: _size_2_t = 1,
-                 padding: _size_2_t = 1
-                 ):
+                 padding: _size_2_t = 1,
+                 dilation: _size_2_t =1):
         super().__init__()
         self.CBR = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
@@ -115,3 +115,109 @@ class AttUpSample(nn.Module):
         x1 = self.UpSample(x1)
         x2 = self.attention(x1,x2)
         return self.DoubleConv2d(torch.cat((x1,x2),dim=1))
+    
+def expend_as(tensor, rep):
+    """Repeat elements along the channel dimension"""
+    return tensor.repeat(1, 1, 1, rep)
+
+class ChannelBlock(nn.Module):
+    """Channel attention block"""
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int):
+        super(ChannelBlock, self).__init__()
+        self.out_channels = out_channels
+
+        self.CBR1 = CBR(in_channels, out_channels, kernel_size=3, padding=3, dilation=3)
+        self.CBR2 = CBR(in_channels, out_channels, kernel_size=5, padding=2)
+        self.CBR3 = CBR(out_channels*2, out_channels, kernel_size=1, padding=0)
+
+        self.AvgPool = nn.AdaptiveAvgPool2d(1)
+        self.Attention = nn.Sequential(
+            nn.Linear(out_channels*2, out_channels),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.Linear(out_channels, out_channels),
+            nn.Sigmoid()
+        )
+        
+    def forward(self, x):
+        x1 = self.CBR1(x)
+        x2 = self.CBR2(x)
+        x3 = self.AvgPool(torch.cat([x1, x2], dim=1))
+        x3 = x3.view(x3.size(0), -1)
+        att = self.Attention(x3)
+        att = att.view(att.size(0), self.out_channels, 1, 1)
+        x4 = self.CBR3(torch.cat([x1*att, x2*(1-att)], dim=1))
+        return x4
+
+class SpatialBlock(nn.Module):
+    """Spatial attention block"""
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int):
+        super(SpatialBlock, self).__init__()
+        self.CBR1 = CBR(in_channels, out_channels, kernel_size=3, padding=1)
+        self.CBR2 = CBR(out_channels, out_channels, kernel_size=1, padding=0)
+        self.CBR3 = CBR(out_channels*2, out_channels, kernel_size=3, padding=1)
+        self.Attention = nn.Sequential(
+            nn.Conv2d(out_channels*2, 1, kernel_size=1, padding=0),
+            nn.Sigmoid()
+        )
+        
+    def forward(self, x1, x2):
+        x1 = self.CBR2(self.CBR1(x1))
+        att = self.Attention(torch.cat([x1, x2], dim=1))
+        att = att.expand_as(x1)
+        x3 = self.CBR3(torch.cat([x2*att, x1*(1-att)], dim=1))   
+        return x3
+
+class HAAM(nn.Module):
+    """Hierarchical Attention Aggregation Module"""
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int):
+        super(HAAM, self).__init__()
+        self.channel_block = ChannelBlock(in_channels, out_channels)
+        self.spatial_block = SpatialBlock(in_channels, out_channels)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        channel_data = self.channel_block(x)
+        haam_data = self.spatial_block(x, channel_data)
+        haam_data = self.relu(self.bn(haam_data))
+        return haam_data
+
+class DoubleHAAM(nn.Module):
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int,
+                 p:float=0.05):
+        super().__init__()
+        self.haam1= HAAM(in_channels, out_channels)
+        self.dropout = nn.Dropout2d(p)
+        self.haam2= HAAM(out_channels, out_channels)
+
+    def forward(self, x):
+        return self.haam2(self.dropout(self.haam1(x)))
+    
+class HAAMUpSample(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: _size_2_t = 3,
+                 stride: _size_2_t = 1,
+                 padding: _size_2_t = 1,
+                 scale_factor:int =2,
+                 p:float=0.05):
+        super().__init__()
+        self.UpSample = nn.Sequential(
+            nn.Upsample(scale_factor=scale_factor),
+            CBR(in_channels, out_channels, kernel_size, stride, padding),
+            nn.Dropout2d(p)
+        )
+        self.DoubleHAAM = DoubleHAAM(in_channels, out_channels, p)
+
+    def forward(self, x1:Tensor, x2:Tensor) -> Tensor:
+        return self.DoubleHAAM(torch.cat((self.UpSample(x1),x2),dim=1))

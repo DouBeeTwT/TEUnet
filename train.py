@@ -3,13 +3,13 @@ from Scripts.utils.data import Database2Dataloader
 from Scripts.utils.trainer import Trainer
 from Scripts.model.loss import bce_dice_loss
 
-device="cuda:1"
+device="cuda:2"
 num_epochs = 100
 seed_list = [0]
 batch_size = 4
 image_size = 512
 database_name_list = ["BUSI"]
-model_name_list = ["AttUnet"]
+model_name_list = ["AAUnet"]
 in_channels = 1
 out_channels = 1
 hidden_channels = 64
@@ -36,7 +36,7 @@ for database_name in database_name_list:
                 model.to(device)
             elif model_name == "AAUnet":
                 from Scripts.model import AAUnet
-                model = AAUnet(in_channels,out_channels,hidden_channels, p)
+                model = AAUnet(in_channels,out_channels,hidden_channels//2, p)
                 model.to(device)
             elif model_name == "TEUnet":
                 from Scripts.model import TEUnet
