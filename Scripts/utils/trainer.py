@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 
 class Trainer:
-    def __init__(self, model, num_epochs, optimizer, criterion, pth, device, seed):
+    def __init__(self, model_name, model, num_epochs, optimizer, criterion, pth, device, seed):
         torch.cuda.manual_seed(seed)
         self.num_epochs = num_epochs
         self.optimizer = optimizer
         self.criterion = criterion
+        self.model_name = model_name
         self.model = model
         self.pth = pth
         self.device = device
