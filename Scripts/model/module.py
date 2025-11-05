@@ -221,3 +221,61 @@ class HAAMUpSample(nn.Module):
 
     def forward(self, x1:Tensor, x2:Tensor) -> Tensor:
         return self.DoubleHAAM(torch.cat((self.UpSample(x1),x2),dim=1))
+    
+class EntropyBlock(nn.Module):
+    def __init__(self,
+                 in_channels:int = 3):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_channels, in_channels//4),
+            nn.ReLU(),
+            nn.Linear(in_channels//4, in_channels)
+        )
+        self.sigmod = nn.Sigmoid()
+        self.head = nn.Sequential(
+            nn.Conv2d(in_channels,1,kernel_size=1, stride=1),
+            nn.Sigmoid()
+        )
+        self.alpha = torch.tensor(0.9, requires_grad=True)
+    
+    def entorpy(self, x):
+        x = torch.clamp(x, 1e-7, 1-1e-7)
+        return -x*torch.log2(x)-(1-x)*torch.log2(1-x)
+    
+    def forward(self, x, a):
+        size = x.shape[-1]
+        # Entropy Space attention
+        x1= x * a
+        # Channel Attention
+        x1 = x1 * self.sigmod(self.mlp(nn.MaxPool2d(size)(x1).squeeze())+self.mlp(nn.AvgPool2d(size)(x1).squeeze())).unsqueeze(2).unsqueeze(3)
+        # Update Space Attention Map
+        a = self.alpha * a + (1-self.alpha) * self.entorpy(self.head(x1))
+        a = F.interpolate(a, scale_factor=2)
+        # Reside Connect
+        x1 = x1 + x
+
+        return x1, a
+
+class EntropyUpSample(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: _size_2_t = 3,
+                 stride: _size_2_t = 1,
+                 padding: _size_2_t = 1,
+                 scale_factor:int =2,
+                 p:float = 0.05):
+        super().__init__()
+        self.UpSample = nn.Sequential(
+            nn.Upsample(scale_factor=scale_factor),
+            CBR(in_channels, out_channels, kernel_size, stride, padding),
+            nn.Dropout2d(p)
+        )
+        self.EntropyAttention = EntropyBlock(out_channels)
+        self.DoubleConv2d = DoubleConv2d(in_channels, out_channels, kernel_size, stride, padding, p)
+
+    def forward(self, x1:Tensor, x2:Tensor, a:Tensor) -> Tensor:
+        x1 = self.UpSample(x1)
+        x2, a = self.EntropyAttention(x2, a)
+        x2 = self.DoubleConv2d(torch.cat((x1, x2), dim=1))
+        return x2, a

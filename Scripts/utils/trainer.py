@@ -63,25 +63,24 @@ class Trainer:
                 self.optimizer.zero_grad()
 
                 outputs = self.model(images)
-                #masks = maxpooler(masks)
-                loss = self.criterion(outputs, masks)
+                if self.model_name == "TEUnet":
+                    loss = (self.criterion(outputs[0], maxpooler(masks)) + self.criterion(outputs[1], masks)) / 2
+                    outputs = outputs[1]
+                else:
+                    loss = self.criterion(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
 
                 train_loss += loss.item()
-                train_dice += self.dice_coeff(outputs[1]>0.5, masks)
-                train_iou += self.iou(outputs[1]>0.5, masks)
-
-                #if (i + 1) % self.log_interval == 0:
-                #    print(f'Epoch [{epoch + 1}/{self.num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {loss.item():.4f}, Dice Coef: {dice:.4f}')
+                train_dice += self.dice_coeff(outputs>0.5, masks)
+                train_iou += self.iou(outputs>0.5, masks)
 
             # Validation loop
             self.model.eval()
             with torch.no_grad():
                 for images, masks in val_loader:
                     images, masks = images.to(self.device), masks.to(self.device)
-                    outputs = self.model(images)
-                    #masks = maxpooler(masks)
+                    outputs = self.model(images)[1] if self.model_name == "TEUnet" else self.model(images)
                     val_loss += self.criterion(outputs, masks).item()
                     val_dice += self.dice_coeff(outputs>0.5, masks)
                     val_iou += self.iou(outputs>0.5, masks)
