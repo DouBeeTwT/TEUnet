@@ -1,16 +1,15 @@
 from torch import Tensor
 import torch.nn as nn
-from .module import DoubleConv2d, EntropyUpSample, EntropyBlock
 from typing import List
+from .module import DoubleConv2d, EntropyBlock, EntropyUpSample
 
-class TEUnet(nn.Module):
+class TEUnet2_Encoder(nn.Module):
     def __init__(self,
                  in_channels:int,
                  out_channels:int,
                  hidden_channels:int=32,
                  p:float = 0.05):
         super().__init__()
-
         self.DownSampleLayer1 = DoubleConv2d(in_channels=in_channels, out_channels=hidden_channels, p=p)
         self.DownSampleLayer2 = nn.Sequential(
             DoubleConv2d(in_channels=hidden_channels, out_channels=hidden_channels*2, stride=2, p=p),
@@ -37,6 +36,25 @@ class TEUnet(nn.Module):
             nn.Sigmoid()
         )
 
+    def forward(self, x:Tensor) -> List:
+        # encoding path
+        x1 = self.DownSampleLayer1(x)
+        x2 = self.DownSampleLayer2(x1)
+        x3 = self.DownSampleLayer3(x2)
+        x4 = self.DownSampleLayer4(x3)
+        x5 = self.DownSampleLayer5(x4)
+        a1 = self.AttentionHead(x5)
+        
+        return [a1, x1, x2, x3, x4, x5]
+
+
+class TEUnet2_Decoder(nn.Module):
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int,
+                 hidden_channels:int=32,
+                 p:float = 0.05):
+        super().__init__()
         self.EntropyBlock = EntropyBlock(in_channels=hidden_channels*16)
 
         self.UpSampleLayer5 = EntropyUpSample(in_channels=hidden_channels*16, out_channels=hidden_channels*8)
@@ -49,15 +67,8 @@ class TEUnet(nn.Module):
             nn.Sigmoid()
             )
 
-    def forward(self, x:Tensor) -> List:
-        # encoding path
-        x1 = self.DownSampleLayer1(x)
-        x2 = self.DownSampleLayer2(x1)
-        x3 = self.DownSampleLayer3(x2)
-        x4 = self.DownSampleLayer4(x3)
-        x5 = self.DownSampleLayer5(x4)
-        a1 = self.AttentionHead(x5)
-
+    def forward(self, x_list:List) -> List:
+        a1, x1, x2, x3, x4, x5 = x_list[0],x_list[1],x_list[2],x_list[3],x_list[4],x_list[5]
         # decoding path
         x5, a2 = self.EntropyBlock(x5, a1)
         x4, a3 = self.UpSampleLayer5(x5, x4, a2)
@@ -68,4 +79,18 @@ class TEUnet(nn.Module):
         # Segmentation
         x1 = self.SegmentationHead(x1)
 
-        return [a1, x1]
+        return x1
+
+class TEUnet2(nn.Module):
+    def __init__(self,
+                 in_channels:int,
+                 out_channels:int,
+                 hidden_channels:int=32,
+                 p:float = 0.05):
+        super().__init__()
+        self.encoder = TEUnet2_Encoder(in_channels, out_channels, hidden_channels, p)
+        self.decoder = TEUnet2_Decoder(in_channels, out_channels, hidden_channels, p)
+
+    def forward(self, x:Tensor) -> List:
+        x_list = self.encoder(x)
+        return self.decoder(x_list)

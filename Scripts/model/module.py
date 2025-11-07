@@ -37,11 +37,22 @@ class DoubleConv2d(nn.Module):
         self.double_conv2d = nn.Sequential(
             CBR(in_channels, out_channels, kernel_size, stride, padding),
             nn.Dropout2d(p),
-            CBR(out_channels, out_channels, kernel_size, stride, padding),
+            CBR(out_channels, out_channels, kernel_size, stride=1, padding=padding),
         )
+        if out_channels != in_channels:
+            self.connect =nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
+                nn.BatchNorm2d(out_channels)
+            )
+        else:
+            self.connect = None
 
     def forward(self, x:Tensor) -> Tensor:
-        return self.double_conv2d(x)
+        x1 = self.double_conv2d(x)
+        if self.connect is None:
+            return x1 + x
+        else:
+            return x1 + self.connect(x)
 
 class UpSample(nn.Module):
     def __init__(self,

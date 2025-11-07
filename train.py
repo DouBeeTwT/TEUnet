@@ -13,7 +13,8 @@ model_name_list = ["TEUnet"]
 in_channels = 1
 out_channels = 1
 hidden_channels = 64
-p = 0.05
+p = 0.0
+need_retrain = False
 
 # Data
 for database_name in database_name_list:
@@ -28,25 +29,35 @@ for database_name in database_name_list:
         for model_name in model_name_list:
             if model_name == "Unet":
                 from Scripts.model import Unet
-                model = Unet(in_channels,out_channels,hidden_channels, p)
-                model.to(device)
+                model = Unet(in_channels,out_channels,hidden_channels, p) 
             elif model_name == "AttUnet":
                 from Scripts.model import AttUnet
                 model = AttUnet(in_channels,out_channels,hidden_channels, p)
-                model.to(device)
             elif model_name == "AAUnet":
                 from Scripts.model import AAUnet
                 model = AAUnet(in_channels,out_channels,hidden_channels//2, p)
-                model.to(device)
             elif model_name == "TEUnet":
                 from Scripts.model import TEUnet
-                model = TEUnet(in_channels,out_channels,hidden_channels, p)
-                model.to(device)
+                model = TEUnet(in_channels,out_channels,hidden_channels//2, p)
+            elif model_name == "Unet++":
+                from segmentation_models_pytorch import UnetPlusPlus
+                model = UnetPlusPlus(encoder_name="resnet34", in_channels=in_channels, classes=out_channels)
+            elif model_name == "Segformer":
+                from segmentation_models_pytorch import Segformer
+                model = Segformer(encoder_name="resnet34", in_channels=in_channels, classes=out_channels)
+            elif model_name == "DeepLabV3+":
+                from segmentation_models_pytorch import DeepLabV3Plus
+                model = DeepLabV3Plus(encoder_name="resnet34", in_channels=in_channels, classes=out_channels)
+            elif model_name == "DeepLabV3":
+                from segmentation_models_pytorch import DeepLabV3
+                model = DeepLabV3(encoder_name="resnet34", in_channels=in_channels, classes=out_channels)
 
+            model.to(device)
             # Trainer
-            trainer = Trainer(model_name=model_name, model=model, num_epochs=num_epochs, device=device, seed=seed,
+            model_pth = f"Checkpoints/{model_name}_{database_name}_{seed}.pth" if need_retrain else None
+            trainer = Trainer(model_name=model_name, model=model, num_epochs=num_epochs, device=device, seed=seed, model_pth = model_pth,
                             optimizer=Adam(model.parameters(), lr=1e-4, weight_decay=1e-6),
                             criterion=bce_dice_loss,
-                            pth=f"./Checkpoints/{model_name}_{database_name}_{seed}.pth")
+                            save_pth=f"./Checkpoints/{model_name}_{database_name}_{seed}.pth")
 
             trainer.train(dataloader)

@@ -1,16 +1,19 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class Trainer:
-    def __init__(self, model_name, model, num_epochs, optimizer, criterion, pth, device, seed):
+    def __init__(self, model_name:str, model, optimizer, criterion, save_pth:str, num_epochs:int=100, device:str="cuda:0", seed:int=42, model_pth:str=None):
         torch.cuda.manual_seed(seed)
         self.num_epochs = num_epochs
         self.optimizer = optimizer
         self.criterion = criterion
         self.model_name = model_name
         self.model = model
-        self.pth = pth
+        if model_pth is not None:
+            self.model.load_state_dict(torch.load(model_pth, map_location=device))
         self.device = device
+        self.save_pth = save_pth
         self.log_interval = 30
 
         # Lists to store training and validation metrics
@@ -42,7 +45,7 @@ class Trainer:
         if dice > self.best_dice:
             self.best_dice = dice
             self.best_epoch = epoch
-            torch.save(self.model.state_dict(), self.pth)
+            torch.save(self.model.state_dict(), self.save_pth)
 
     def train(self, dataloader):
         train_loader, val_loader = dataloader["train"], dataloader["test"]
@@ -66,8 +69,9 @@ class Trainer:
                 if self.model_name == "TEUnet":
                     loss = (self.criterion(outputs[0], maxpooler(masks)) + self.criterion(outputs[1], masks)) / 2
                     outputs = outputs[1]
-                else:
-                    loss = self.criterion(outputs, masks)
+                elif self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3"]:
+                    outputs = F.sigmoid(outputs)
+                loss = self.criterion(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
 
@@ -81,6 +85,7 @@ class Trainer:
                 for images, masks in val_loader:
                     images, masks = images.to(self.device), masks.to(self.device)
                     outputs = self.model(images)[1] if self.model_name == "TEUnet" else self.model(images)
+                    outputs = F.sigmoid(outputs) if self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3"] else outputs
                     val_loss += self.criterion(outputs, masks).item()
                     val_dice += self.dice_coeff(outputs>0.5, masks)
                     val_iou += self.iou(outputs>0.5, masks)
