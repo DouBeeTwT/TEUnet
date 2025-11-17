@@ -39,6 +39,25 @@ class DoubleConv2d(nn.Module):
             nn.Dropout2d(p),
             CBR(out_channels, out_channels, kernel_size, stride=1, padding=padding),
         )
+
+    def forward(self, x:Tensor) -> Tensor:
+        x1 = self.double_conv2d(x)
+        return x1
+
+class DoubleConv2dResConnect(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: _size_2_t = 3,
+                 stride: _size_2_t = 1,
+                 padding: _size_2_t = 1,
+                 p: float=0.05):
+        super().__init__()
+        self.double_conv2d = nn.Sequential(
+            CBR(in_channels, out_channels, kernel_size, stride, padding),
+            nn.Dropout2d(p),
+            CBR(out_channels, out_channels, kernel_size, stride=1, padding=padding),
+        )
         if out_channels != in_channels:
             self.connect =nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
@@ -247,7 +266,6 @@ class EntropyBlock(nn.Module):
             nn.Conv2d(in_channels,1,kernel_size=1, stride=1),
             nn.Sigmoid()
         )
-        self.alpha = torch.tensor(0.9, requires_grad=True)
     
     def entorpy(self, x):
         x = torch.clamp(x, 1e-7, 1-1e-7)
@@ -255,13 +273,12 @@ class EntropyBlock(nn.Module):
     
     def forward(self, x, a):
         size = x.shape[-1]
-        # Entropy Space attention
-        x1= x * a
         # Channel Attention
-        x1 = x1 * self.sigmod(self.mlp(nn.MaxPool2d(size)(x1).squeeze())+self.mlp(nn.AvgPool2d(size)(x1).squeeze())).unsqueeze(2).unsqueeze(3)
+        x1 = x * self.sigmod(self.mlp(nn.MaxPool2d(size)(x).squeeze())+self.mlp(nn.AvgPool2d(size)(x).squeeze())).unsqueeze(2).unsqueeze(3)
+        # Entropy Space Attention
+        x1 = x1 * (self.entorpy(a) > 0.5)
         # Update Space Attention Map
-        a = self.alpha * a + (1-self.alpha) * self.entorpy(self.head(x1))
-        a = F.interpolate(a, scale_factor=2)
+        a = F.interpolate(a, scale_factor=2, mode='bilinear', align_corners=False)
         # Reside Connect
         x1 = x1 + x
 
@@ -280,10 +297,12 @@ class EntropyUpSample(nn.Module):
         self.UpSample = nn.Sequential(
             nn.Upsample(scale_factor=scale_factor),
             CBR(in_channels, out_channels, kernel_size, stride, padding),
-            nn.Dropout2d(p)
         )
         self.EntropyAttention = EntropyBlock(out_channels)
-        self.DoubleConv2d = DoubleConv2d(in_channels, out_channels, kernel_size, stride, padding, p)
+        self.DoubleConv2d = nn.Sequential(
+            DoubleConv2dResConnect(in_channels, out_channels, kernel_size, stride, padding, p),
+            DoubleConv2dResConnect(out_channels, out_channels, kernel_size, stride, padding, p)
+            )
 
     def forward(self, x1:Tensor, x2:Tensor, a:Tensor) -> Tensor:
         x1 = self.UpSample(x1)

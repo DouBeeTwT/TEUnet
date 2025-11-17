@@ -44,7 +44,7 @@ def Database2Dataloader(database_path:str = "./Database/Dataset_BUSI_with_GT",
     images = [mask_images.replace("_mask", "") for mask_images in masks]
     series = list(zip(images, masks))
     dataset = pd.DataFrame(series, columns=['image_path', 'mask_path'])
-    train, test= train_test_split(dataset, test_size=0.25, random_state=42, shuffle=True)
+    train, test= train_test_split(dataset, test_size=0.25, random_state=seed, shuffle=True)
 
     transform = A.Compose([
         A.Normalize(0.330, 0.221),

@@ -3,18 +3,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Trainer:
-    def __init__(self, model_name:str, model, optimizer, criterion, save_pth:str, num_epochs:int=100, device:str="cuda:0", seed:int=42, model_pth:str=None):
+    def __init__(self, model_name:str, model, optimizer, criterion, save_pth:str,
+                 num_epochs:int=100, device:str="cuda:0", seed:int=42, model_pth:str=None,
+                 model_encoder=None, early_stopping_dice:float=0.93):
         torch.cuda.manual_seed(seed)
         self.num_epochs = num_epochs
         self.optimizer = optimizer
         self.criterion = criterion
         self.model_name = model_name
         self.model = model
+        self.model_encoder = model_encoder
         if model_pth is not None:
             self.model.load_state_dict(torch.load(model_pth, map_location=device))
         self.device = device
         self.save_pth = save_pth
         self.log_interval = 30
+        self.early_stopping_dice = early_stopping_dice
 
         # Lists to store training and validation metrics
         self.train_losses = []
@@ -65,13 +69,25 @@ class Trainer:
                 self.model.train()
                 self.optimizer.zero_grad()
 
-                outputs = self.model(images)
+                
                 if self.model_name == "TEUnet":
+                    outputs = self.model(images)
                     loss = (self.criterion(outputs[0], maxpooler(masks)) + self.criterion(outputs[1], masks)) / 2
                     outputs = outputs[1]
-                elif self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3"]:
+                elif self.model_name == "TEUnet2Encoder":
+                    outputs = self.model(images)[0]
+                    masks = maxpooler(masks)
+                    loss = self.criterion(outputs, masks)
+                elif self.model_name == "TEUnet2Decoder":
+                    outputs = self.model(self.model_encoder(images))
+                    loss = self.criterion(outputs, masks)
+                elif self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3", "SwinUNETR"]:
+                    outputs = self.model(images)
                     outputs = F.sigmoid(outputs)
-                loss = self.criterion(outputs, masks)
+                    loss = self.criterion(outputs, masks)
+                else:
+                    outputs = self.model(images)
+                    loss = self.criterion(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
 
@@ -84,8 +100,18 @@ class Trainer:
             with torch.no_grad():
                 for images, masks in val_loader:
                     images, masks = images.to(self.device), masks.to(self.device)
-                    outputs = self.model(images)[1] if self.model_name == "TEUnet" else self.model(images)
-                    outputs = F.sigmoid(outputs) if self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3"] else outputs
+                    if self.model_name == "TEUnet":
+                        outputs = self.model(images)[1]
+                    elif self.model_name == "TEUnet2Encoder":
+                        outputs = self.model(images)[0]
+                        masks = maxpooler(masks)
+                    elif self.model_name == "TEUnet2Decoder":
+                        outputs = self.model(self.model_encoder(images))
+                    elif self.model_name in ["Unet++", "Segformer", "DeepLabV3+", "DeepLabV3", "SwinUNETR"]:
+                        outputs = F.sigmoid(self.model(images))
+                    else:
+                        outputs = self.model(images)
+                    
                     val_loss += self.criterion(outputs, masks).item()
                     val_dice += self.dice_coeff(outputs>0.5, masks)
                     val_iou += self.iou(outputs>0.5, masks)
@@ -110,6 +136,9 @@ class Trainer:
 
             # Save best model
             self.save_best_model(epoch + 1, avg_val_dice)
+            if avg_train_dice >= self.early_stopping_dice:
+                print(f"Early stopping at epoch {epoch+1} with Val Dice: {avg_val_dice:.4f}")
+                break
     
     def get_metrics(self):
         return {

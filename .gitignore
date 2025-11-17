@@ -1,3 +1,4 @@
 Database
 Checkpoints/*.pth
+NoUseCheckpoints/*.pth
 *.ipynb
