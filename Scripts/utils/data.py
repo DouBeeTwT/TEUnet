@@ -40,11 +40,28 @@ def Database2Dataloader(database_path:str = "./Database/Dataset_BUSI_with_GT",
     if not os.path.exists(database_path):
         print("Can't find the database pathway. Please Download {} first.")
         return dataloader
-    masks = glob.glob(f"{database_path}/*/*_mask.png")
-    images = [mask_images.replace("_mask", "") for mask_images in masks]
-    series = list(zip(images, masks))
-    dataset = pd.DataFrame(series, columns=['image_path', 'mask_path'])
-    train, test= train_test_split(dataset, test_size=0.25, random_state=seed, shuffle=True)
+    if "Cancer" in database_path:
+        patient_id = os.listdir(f"{database_path}")
+        train_id, test_id = train_test_split(patient_id, test_size=0.25, random_state=0)
+        train_maskfiles_list, test_maskfiles_list = [], []
+        for p in train_id:
+            maskfiles = glob.glob(f"Database/LungCancer/{p}/*_mask.png")
+            train_maskfiles_list += maskfiles
+        for p in test_id:
+            maskfiles = glob.glob(f"Database/LungCancer/{p}/*_mask.png")
+            test_maskfiles_list += maskfiles
+        train_images = [mask_images.replace("_mask", "") for mask_images in train_maskfiles_list]
+        test_images = [mask_images.replace("_mask", "") for mask_images in test_maskfiles_list]
+        train_series = list(zip(train_images, train_maskfiles_list))
+        test_series = list(zip(test_images, test_maskfiles_list))
+        train = pd.DataFrame(train_series, columns=['image_path', 'mask_path'])
+        test = pd.DataFrame(test_series, columns=['image_path', 'mask_path'])
+    else:
+        masks = glob.glob(f"{database_path}/*/*_mask.png")
+        images = [mask_images.replace("_mask", "") for mask_images in masks]
+        series = list(zip(images, masks))
+        dataset = pd.DataFrame(series, columns=['image_path', 'mask_path'])
+        train, test= train_test_split(dataset, test_size=0.25, random_state=seed, shuffle=True)
 
     transform = A.Compose([
         A.Normalize(0.330, 0.221),

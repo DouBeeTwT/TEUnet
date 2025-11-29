@@ -274,7 +274,8 @@ class EntropyBlock(nn.Module):
     def forward(self, x, a):
         size = x.shape[-1]
         # Channel Attention
-        x1 = x * self.sigmod(self.mlp(nn.MaxPool2d(size)(x).squeeze())+self.mlp(nn.AvgPool2d(size)(x).squeeze())).unsqueeze(2).unsqueeze(3)
+        x1 = x * self.sigmod(self.mlp(nn.MaxPool2d(size)(x).squeeze(3).squeeze(2))+
+                             self.mlp(nn.AvgPool2d(size)(x).squeeze(3).squeeze(2))).unsqueeze(2).unsqueeze(3)
         # Entropy Space Attention
         x1 = x1 * (self.entorpy(a) > 0.5)
         # Update Space Attention Map

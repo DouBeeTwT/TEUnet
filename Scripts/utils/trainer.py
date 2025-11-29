@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 class Trainer:
     def __init__(self, model_name:str, model, optimizer, criterion, save_pth:str,
                  num_epochs:int=100, device:str="cuda:0", seed:int=42, model_pth:str=None,
-                 model_encoder=None, early_stopping_dice:float=0.93):
+                 model_encoder=None, early_stopping_dice:float=0.999):
         torch.cuda.manual_seed(seed)
+        self.seed = seed
         self.num_epochs = num_epochs
         self.optimizer = optimizer
         self.criterion = criterion
@@ -46,7 +48,7 @@ class Trainer:
         return iou_score
 
     def save_best_model(self, epoch, dice):
-        if dice > self.best_dice:
+        if dice > self.best_dice and epoch > 5:
             self.best_dice = dice
             self.best_epoch = epoch
             torch.save(self.model.state_dict(), self.save_pth)
@@ -63,7 +65,7 @@ class Trainer:
             maxpooler = nn.MaxPool2d(kernel_size=16, stride=16)
 
             # Training loop
-            for i, (images, masks) in enumerate(train_loader):
+            for i, (images, masks) in tqdm(enumerate(train_loader), ncols=100, leave=False, total=len(train_loader), desc=f"Epoch {epoch+1}/{self.num_epochs}"):
                 images, masks = images.to(self.device), masks.to(self.device)
                 
                 self.model.train()
@@ -98,7 +100,7 @@ class Trainer:
             # Validation loop
             self.model.eval()
             with torch.no_grad():
-                for images, masks in val_loader:
+                for images, masks in tqdm(val_loader, leave=False, ncols=100, total=len(val_loader), desc=f"Epoch {epoch+1}/{self.num_epochs}"):
                     images, masks = images.to(self.device), masks.to(self.device)
                     if self.model_name == "TEUnet":
                         outputs = self.model(images)[1]
@@ -124,7 +126,8 @@ class Trainer:
             avg_val_iou = val_iou / len(val_loader)
 
             #print(f'Epoch [{epoch + 1}/{self.num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
-            print(f'Epoch [{epoch+1:3d}/{self.num_epochs}], Train Dice: {avg_train_dice:.4f}, Val Dice: {avg_val_dice:.4f}, Train IoU: {avg_train_iou:.4f}, Val IoU: {avg_val_iou:.4f}')
+            if avg_val_dice >= self.best_dice:
+                print(f'{self.seed} | {self.model_name} | Epoch [{epoch+1:3d}/{self.num_epochs}], Train Dice: {avg_train_dice:.4f}, Val Dice: {avg_val_dice:.4f}, Train IoU: {avg_train_iou:.4f}, Val IoU: {avg_val_iou:.4f}')
 
             # Save metrics
             self.train_losses.append(avg_train_loss)
