@@ -1,0 +1,11 @@
+pth,dice,iou,recall,precision,specificity
+./Checkpoints/HAM10000/Unet_64_2.pth,0.3799,0.2578,1.0,0.2578,0.1242
+./Checkpoints/HAM10000/Unet_64_2.pth,0.3853,0.2627,1.0,0.2627,0.1495
+./Checkpoints/HAM10000/Unet_64_2.pth,0.3878,0.265,1.0,0.265,0.1606
+./Checkpoints/HAM10000/Unet_64_2.pth,0.4348,0.3061,0.9999,0.3061,0.3126
+./Checkpoints/HAM10000/Unet_64_2.pth,0.5775,0.448,0.999,0.4485,0.5794
+./Checkpoints/HAM10000/Unet_64_2.pth,0.7557,0.6482,0.9941,0.6522,0.8071
+./Checkpoints/HAM10000/Unet_64_2.pth,0.8986,0.8369,0.9536,0.8762,0.9552
+./Checkpoints/HAM10000/Unet_64_2.pth,0.9088,0.8512,0.9378,0.9055,0.9693
+./Checkpoints/HAM10000/Unet_64_2.pth,0.9117,0.8554,0.9198,0.9271,0.9784
+./Checkpoints/HAM10000/Unet_64_2.pth,0.7831,0.6873,0.6911,0.9812,0.9989

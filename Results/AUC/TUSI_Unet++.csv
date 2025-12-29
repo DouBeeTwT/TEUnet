@@ -1,0 +1,11 @@
+pth,dice,iou,recall,precision,specificity
+./Checkpoints/TUSI/Unet++_64_2.pth,0.0743,0.0395,1.0,0.0395,0.0001
+./Checkpoints/TUSI/Unet++_64_2.pth,0.0743,0.0395,1.0,0.0395,0.0003
+./Checkpoints/TUSI/Unet++_64_2.pth,0.1034,0.0564,0.9997,0.0564,0.312
+./Checkpoints/TUSI/Unet++_64_2.pth,0.6206,0.4833,0.9497,0.5042,0.9695
+./Checkpoints/TUSI/Unet++_64_2.pth,0.7789,0.6648,0.8607,0.765,0.9914
+./Checkpoints/TUSI/Unet++_64_2.pth,0.7786,0.6654,0.8361,0.7865,0.9926
+./Checkpoints/TUSI/Unet++_64_2.pth,0.7764,0.6632,0.8153,0.803,0.9934
+./Checkpoints/TUSI/Unet++_64_2.pth,0.7757,0.6626,0.811,0.8063,0.9936
+./Checkpoints/TUSI/Unet++_64_2.pth,0.775,0.6617,0.8067,0.8093,0.9938
+./Checkpoints/TUSI/Unet++_64_2.pth,0.7692,0.6548,0.7834,0.8242,0.9945

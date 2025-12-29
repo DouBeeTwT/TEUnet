@@ -1,0 +1,11 @@
+pth,dice,iou,recall,precision,specificity
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.1255,0.0731,0.8513,0.0731,0.0002
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.1328,0.0779,0.8511,0.0779,0.0741
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.1508,0.0901,0.8492,0.0902,0.226
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.1734,0.106,0.8451,0.1064,0.3707
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.2352,0.152,0.8164,0.1553,0.6211
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.4376,0.3314,0.7298,0.3579,0.9044
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.6643,0.5805,0.6232,0.5875,0.9798
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.681,0.5996,0.6049,0.6007,0.9832
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.6803,0.6009,0.5868,0.6182,0.986
+./Checkpoints/BUSI/AttUnet_64_2.pth,0.5381,0.4627,0.3248,0.655,0.9983

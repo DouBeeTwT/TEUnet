@@ -1,15 +1,3 @@
-import numpy as np
-import pandas as pd
-
-# TODO： 遍历Database, 计算模型各项指标，然后保存到csv中
-
-import torch
-from torch.optim import Adam
-from Scripts.utils.data import Database2Dataloader
-from Scripts.utils.trainer import Trainer
-from Scripts.model.loss import bce_dice_loss
-import warnings
-warnings.filterwarnings("ignore")
 from Scripts.utils.metrics import metrics
 import argparse
 

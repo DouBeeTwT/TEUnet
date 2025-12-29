@@ -9,11 +9,9 @@ class metrics():
     def __init__(self,
                  csv_path:str,
                  device:str="cuda:0",
-                 theholds:float=0.5,
                  smooth:float=1e-5):
         self.csv_path = csv_path
         self.device = device
-        self.theholds = theholds
         self.smooth = smooth
 
     def calc_score(self, predicted, target):
@@ -45,11 +43,11 @@ class metrics():
         self.score["specificity"] += specificity.item()*n
     
     def load_dataset(self, database_name:str, batch_size:int=1, seed:int=0):
-        self.database_name = database_name
+        self.database_name = database_name.split('-')[-1]
         dataloader = Database2Dataloader(database_path=f"Database/{database_name}", batch_size=batch_size, seed=seed)
         self.dataloader = dataloader["test"]
 
-    def load_model(self, model_name:str, in_channels:int, out_channels:int, hidden_channels:int, seed:int, p:float=0.0):
+    def load_model(self, model_name:str, in_channels:int, out_channels:int, hidden_channels:int, seed:int, p:float=0.0, show_attention=False):
         if model_name == "Unet":
             from Scripts.model import Unet
             model = Unet(in_channels,out_channels,hidden_channels, p)
@@ -68,16 +66,13 @@ class metrics():
             feature_size = hidden_channels//2
         elif model_name == "TEUnet2":
             feature_size = hidden_channels//2
-            from Scripts.model import TEUnet2_Encoder, TEUnet2_Decoder
-            model_encoder = TEUnet2_Encoder(in_channels,out_channels,hidden_channels//2, p)
-            model_encoder.load_state_dict(torch.load(f"./Checkpoints/{self.database_name}/TEUnet2Encoder_{feature_size}_{seed}.pth", map_location=self.device))
-            model_encoder.to(self.device).eval()
-            model_decoder = TEUnet2_Decoder(in_channels,out_channels,hidden_channels//2, p)
-            model_decoder.load_state_dict(torch.load(f"./Checkpoints/{self.database_name}/TEUnet2Decoder_{feature_size}_{seed}.pth", map_location=self.device))
-            model_decoder.to(self.device).eval()
+            from Scripts.model import TEUnet2_Encoder, TEUnet2_Decoder, TEUnet2
+            model = TEUnet2(in_channels,out_channels,hidden_channels//2, p, show_attention=show_attention)
+            model.encoder.load_state_dict(torch.load(f"./Checkpoints/{self.database_name}/TEUnet2Encoder_{feature_size}_{seed}.pth", map_location=self.device))
+            model.decoder.load_state_dict(torch.load(f"./Checkpoints/{self.database_name}/TEUnet2Decoder_{feature_size}_{seed}.pth", map_location=self.device))
+            model.to(self.device).eval()
             self.model_name = model_name
-            self.model_encoder = model_encoder
-            self.model_decoder = model_decoder
+            self.model = model
             self.pth = f"./Checkpoints/{self.database_name}/{model_name}_{feature_size}_{seed}.pth"
         elif model_name == "Unet++":
             from Scripts.model import UnetPlusPlus
@@ -118,7 +113,7 @@ class metrics():
                 writer.writeheader()
             writer.writerow(self.score)
 
-    def evaluate(self):
+    def evaluate(self, threshold:float=0.5):
         self.score = {
             "n": 0,
             "dice": 0.0,
@@ -139,7 +134,7 @@ class metrics():
                 else:
                     outputs = self.model(images)
 
-                self.calc_score(outputs>self.theholds, masks)
+                self.calc_score(outputs>threshold, masks)
         
         # Average the scores
         for key in self.score.keys():
